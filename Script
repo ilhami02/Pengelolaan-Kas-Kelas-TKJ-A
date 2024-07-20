@@ -257,6 +257,34 @@ function total(id) {
 }
 
 /**
+ * Menghapus untuk nama tertentu.
+ * @param {string} name - Nama yang akan diperiksa.
+ * @param {string} id - ID chat pengguna yang mengirim perintah.
+ */
+function hapus(name, id) {
+  // Mendapatkan nilai dari kolom A
+  var dataRange = sheet.getRange('A:A').getValues();
+  var rowIndex = -1;
+
+  // Mencari baris yang cocok dengan nama yang diberikan
+  for (var i = 0; i < dataRange.length; i++) {
+    if (dataRange[i][0] === name) {
+      rowIndex = i + 1; // Mengimbangi indeks array (dimulai dari 1) dan header
+      break;
+    }
+  }
+
+  // Mengecek jika nama ditemukan
+  if (rowIndex === -1) {
+    sendText(id, "Nama '" + name + "' tidak ditemukan di kolom A.");
+  } else {
+    // Menghapus data dari kolom A hingga AZ di baris yang ditemukan
+    sheet.getRange(rowIndex, 1, 1, 52).clearContent(); // Menghapus konten dari kolom A hingga AZ (52 kolom)
+    sendText(id, "Data untuk nama '" + name + "' telah dihapus.");
+  }
+}
+
+/**
  * Menambahkan kolom baru ke sheet.
  */
 function addColumns() {
