@@ -1,9 +1,9 @@
-var token_bot = "5846382190:AAELEzwmUgyyKHqHBWrQMFAeTYTFAgBILHI";
+var token_bot = "5846382190:AAELEzwmUgyyKHqHBWrQMFAeTYTFAgBILHI"; // Token Bot Telegram
 var url = "https://api.telegram.org/bot" + token_bot;
-var webAppUrl = "https://script.google.com/macros/s/AKfycbyBh2ZPPBYxZKXfAclfqm3TnQ7hAOrkGeyCTQO1_1PxprW3J0r3Gszyjf5q0vkyqaAqmA/exec";
+var webAppUrl = "https://script.google.com/macros/s/AKfycbyBh2ZPPBYxZKXfAclfqm3TnQ7hAOrkGeyCTQO1_1PxprW3J0r3Gszyjf5q0vkyqaAqmA/exec"; // Url Web setelah Deployment di GApps Script
 
-var sheet_name = "KELAS1";
-var sheet_ssid = "1E8AB4e5QxEoxTuAH0rNGXooGcrhy3MR0R1LeJD0m5uk";
+var sheet_name = "KELAS1"; // Nama Sheet
+var sheet_ssid = "1E8AB4e5QxEoxTuAH0rNGXooGcrhy3MR0R1LeJD0m5uk"; // SSID Spreadsheet, bisa dilihat pada link spreadsheet anda
 var sheet = SpreadsheetApp.openById(sheet_ssid).getSheetByName(sheet_name);
 
 var admin_id = "1289002973"; // ID admin untuk akses command tertentu
