@@ -1,12 +1,12 @@
-var token_bot = "6495021061:AAEjkWf8-NZarKAI7an4b9b96DjQpk3L6H8";
+var token_bot = "5846382190:AAELEzwmUgyyKHqHBWrQMFAeTYTFAgBILHI";
 var url = "https://api.telegram.org/bot" + token_bot;
-var webAppUrl = "https://script.google.com/macros/s/AKfycbyz_BD8GMf-VcSpd3tBHpWP0OFU2KYxSI72fVEUwCaP0guZpBY-B1FN_HMDlFdtf7lU/exec";
+var webAppUrl = "https://script.google.com/macros/s/AKfycbyBh2ZPPBYxZKXfAclfqm3TnQ7hAOrkGeyCTQO1_1PxprW3J0r3Gszyjf5q0vkyqaAqmA/exec";
 
-var sheet_name = "BeforeUTS_Semester1";
-var sheet_ssid = "13tlVBDfpqcaTZNvk1owokjzS7FGR2Z5bk7TM3vGVHsE";
+var sheet_name = "KELAS1";
+var sheet_ssid = "1E8AB4e5QxEoxTuAH0rNGXooGcrhy3MR0R1LeJD0m5uk";
 var sheet = SpreadsheetApp.openById(sheet_ssid).getSheetByName(sheet_name);
 
-var admin_ids = ["5591424289", "1487023118"]; // ID admin untuk akses command tertentu
+var admin_id = "1289002973"; // ID admin untuk akses command tertentu
 
 /**
  * Mengatur webhook untuk bot Telegram agar dapat menerima pembaruan dari Telegram.
@@ -62,7 +62,7 @@ function doPost(e) {
       case "/bayar":
       case "/input":
       case "/hapus":
-        if (admin_ids.includes(String(id))) {
+        if (String(id) === admin_id) {
           if (subCommand) {
             if (command === "/per") {
               tambahDanEdit(subCommand, id);
@@ -90,9 +90,6 @@ function doPost(e) {
       case "/total":
         total(id);
         break;
-      case "/format":
-        sendText(id, "<b>Format Khusus Admin:</b>\n/bayar [nama] [nominal] (Mencatat pembayaran)\n/hapus [nama] [nominal] (Menghapus data pembayaran kas)\n\n<b>Format User:</b>\n/cek [nama] (Mengecek status kas pada setiap siswa)\n/total (Mengecek keseluruhan kas)");
-        break;
       default:
         sendText(id, "Perintah yang anda kirimkan tidak ada di bot ini!");
     }
@@ -116,23 +113,21 @@ function input(name, id) {
   var pembayaran = 0;
   
   if (per === "Mingguan") {
-    pembayaran = 16;
+    pembayaran = 48;
   } else if (per === "Bulanan") {
-    pembayaran = 4;
+    pembayaran = 12;
   } else {
     sendText(id, "Silahkan atur format pembayaran untuk perbulan atau perminggu pada perintah <b>/per</b>");
     return;
   }
 
   if (exists) {
-    console.log("Input nama tidak berhasil!");
     sendText(id, "Nama '" + name + "' telah ada didalam data!");
   } else {
     sheet.getRange(lastRow + 1, 1).setValue(name);
     sheet.getRange(lastRow + 1, 50).setValue("0");
     sheet.getRange(lastRow + 1, 51).setValue(pembayaran);
     sheet.getRange(lastRow + 1, 52).setValue("0");
-    console.log("Input nama berhasil!");
     sendText(id, "Nama '" + name + "' telah ditambahkan!");
   }
 }
@@ -164,7 +159,6 @@ function tambahDanEdit(subCommand, id) {
   cell_nominal.setValue(amount);
 
   sendText(id, "Jumlah pembayaran '" + amount + "' per '" + per + "' telah diatur.");
-  console.log("Pembayaran telah diatur");
 }
 
 /**
@@ -174,48 +168,38 @@ function tambahDanEdit(subCommand, id) {
  */
 function bayar(subCommand, id) {
   var parts = subCommand.split(" ");
-  var inputName = parts.slice(0, parts.length - 1).join(" ").trim(); // Use input name for lookup
+  var name = parts.slice(0, parts.length - 1).join(" ").trim();
   var amount = parseInt(parts[parts.length - 1], 10);
   var per = parseInt(sheet.getRange("BA2").getValue(), 10);
-  var logSheet = SpreadsheetApp.openById(sheet_ssid).getSheetByName("Log"); // Log sheet
 
   var rowdataRange = sheet.getRange(2, 1, sheet.getLastRow(), 1).getValues();
   var rowIndex = -1;
-  var correctName = ""; // To store the correct name
 
   for (var i = 0; i < rowdataRange.length; i++) {
-    if (rowdataRange[i][0].toLowerCase().includes(inputName.toLowerCase())) { // Search by input name
-      rowIndex = i + 2; // Adjust for header
-      correctName = rowdataRange[i][0]; // Get the actual name from the sheet
+    if (rowdataRange[i][0] === name) {
+      rowIndex = i + 2; // Menambahkan 2 untuk mengimbangi indeks array dan header
       break;
     }
   }
 
   if (rowIndex === -1) {
-    sendText(id, "Nama '" + inputName + "' tidak ditemukan di kolom A.");
+    sendText(id, "Nama '" + name + "' tidak ditemukan di kolom A.");
   } else if (isNaN(amount) || amount % per !== 0) {
     sendText(id, "Nominal harus sesuai dengan pembayaran per minggu/bulan");
     return;
   } else {
     var byrbrpkali = parseInt(sheet.getRange(rowIndex, 50).getValue(), 10);
     var numberOfEntries = amount / per;
-
-    // Log before the change
-    var timestamp = new Date();
-    logSheet.appendRow([correctName, amount, timestamp, "Sebelum", byrbrpkali]); // Log correct name
-
+    for (var j = 0; j < numberOfEntries; j++) {
+      sheet.getRange(rowIndex, byrbrpkali + 2 + j).setValue(per);
+    }
     var kolomSisabayar = parseInt(sheet.getRange(rowIndex, 51).getValue(), 10);
     var sisabayar = kolomSisabayar - numberOfEntries;
     sheet.getRange(rowIndex, 50).setValue(byrbrpkali + numberOfEntries);
     sheet.getRange(rowIndex, 51).setValue(sisabayar);
     var total_bayar = (byrbrpkali + numberOfEntries) * per;
     sheet.getRange(rowIndex, 52).setValue(total_bayar);
-
-    // Log after the change
-    logSheet.appendRow([correctName, amount, timestamp, "Setelah", byrbrpkali + numberOfEntries]); // Log correct name
-
-    sendText(id, "Nominal " + amount + " telah ditambahkan untuk '" + correctName + "'. Total sekarang: " + total_bayar);
-    console.log("Pembayaran berhasil!");
+    sendText(id, "Nominal " + amount + " telah ditambahkan untuk '" + name + "'. Total sekarang: " + total_bayar);
   }
 }
 
@@ -230,14 +214,14 @@ function cek_kas(name, id) {
   var rowIndex = -1;
 
   for (var i = 0; i < dataRange.length; i++) {
-      if (dataRange[i][0].toLowerCase().includes(name.toLowerCase())) { // Cari berdasarkan kata pertama
+    if (dataRange[i][0] === name) {
       rowIndex = i + 1; // Mengimbangi indeks array (dimulai dari 1) dan header
       break;
     }
   }
 
   if (rowIndex === -1) {
-    sendText(id, "Nama '" + name + "' tidak ditemukan.");
+    sendText(id, "Nama '" + name + "' tidak ditemukan di kolom A.");
   } else {
     var kolomSudahbayar = sheet.getRange(rowIndex, 50).getValue();
     var kolomSisabayar = sheet.getRange(rowIndex, 51).getValue();
@@ -277,86 +261,27 @@ function total(id) {
  * @param {string} name - Nama yang akan diperiksa.
  * @param {string} id - ID chat pengguna yang mengirim perintah.
  */
-function hapus(subCommand, id) {
-  var parts = subCommand.split(" ");
-  var inputName = parts.slice(0, parts.length - 1).join(" ").trim(); // Use input name for lookup
-  var amountToRemove = parseInt(parts[parts.length - 1], 10); // Get the amount to remove
-
-  if (isNaN(amountToRemove) || amountToRemove <= 0) {
-    sendText(id, "Jumlah yang ingin dihapus harus berupa angka positif.");
-    return;
-  }
-
-  var logSheet = SpreadsheetApp.openById(sheet_ssid).getSheetByName("Log"); // Log sheet
-  var rowIndex = getRowIndexByPartialName(inputName); // Get row index by partial name
-  var correctName = ""; // To store the correct name
-
-  if (rowIndex === -1) {
-    sendText(id, "Nama '" + inputName + "' tidak ditemukan.");
-    return;
-  } else {
-    correctName = sheet.getRange(rowIndex, 1).getValue(); // Get the actual name from the sheet
-  }
-
-  var currentPaid = parseInt(sheet.getRange(rowIndex, 50).getValue(), 10); // Total paid
-  var paymentPer = parseInt(sheet.getRange("BA2").getValue(), 10); // Payment per week/month
-  var currentAmountPaid = currentPaid * paymentPer; // Total amount already paid
-
-  // Check if the amount to remove is valid
-  if (amountToRemove > currentAmountPaid) {
-    sendText(id, "Jumlah yang ingin dihapus melebihi total pembayaran yang sudah dilakukan.");
-    return;
-  }
-
-  // Update the payment details in the main sheet
-  var numberOfEntriesToRemove = Math.floor(amountToRemove / paymentPer); // How many entries to remove
-  var newPaidCount = currentPaid - numberOfEntriesToRemove; // Remaining paid count
-
-  // Update the main sheet
-  sheet.getRange(rowIndex, 50).setValue(newPaidCount); // Update paid count
-  var remainingToPay = parseInt(sheet.getRange(rowIndex, 51).getValue(), 10); // Remaining to pay
-  remainingToPay += numberOfEntriesToRemove; // Update remaining to pay
-  sheet.getRange(rowIndex, 51).setValue(remainingToPay); // Update remaining to pay
-
-  // Update total_bayar
-  var total_bayar = newPaidCount * paymentPer; // Calculate new total
-  sheet.getRange(rowIndex, 52).setValue(total_bayar); // Update total_bayar
-
-  // Log the removal
-  var timestamp = new Date();
-  logSheet.appendRow([correctName, -amountToRemove, timestamp, "Hapus", currentPaid]); // Log correct name
-
-  sendText(id, "Jumlah " + amountToRemove + " telah dihapus untuk '" + correctName + "'. Total sekarang: " + total_bayar);
-  console.log("Pembayaran untuk '" + correctName + "' telah dihapus sebesar " + amountToRemove);
-}
-
-
-function getRowIndexByPartialName(partialName) {
+function hapus(name, id) {
+  // Mendapatkan nilai dari kolom A
   var dataRange = sheet.getRange('A:A').getValues();
+  var rowIndex = -1;
+
+  // Mencari baris yang cocok dengan nama yang diberikan
   for (var i = 0; i < dataRange.length; i++) {
-    if (dataRange[i][0].toLowerCase().includes(partialName.toLowerCase())) {
-      return i + 1; // Mengimbangi indeks array
+    if (dataRange[i][0] === name) {
+      rowIndex = i + 1; // Mengimbangi indeks array (dimulai dari 1) dan header
+      break;
     }
   }
-  return -1; // Jika tidak ditemukan
-}
 
-
-/**
- * Log
- */
-function logPembayaran(name, amount) {
-  var sheetLog = SpreadsheetApp.openById(sheet_ssid).getSheetByName("Log"); // Akses sheet Log
-  var lastRowLog = sheetLog.getLastRow() + 1; // Mendapatkan baris terakhir di sheet Log
-
-  // Mendapatkan tanggal dan waktu saat ini
-  var date = new Date();
-  var tanggalWaktu = Utilities.formatDate(date, Session.getScriptTimeZone(), "dd/MM/yyyy HH:mm:ss");
-
-  // Menambahkan log ke sheet Log
-  sheetLog.getRange(lastRowLog, 1).setValue(tanggalWaktu); // Menyimpan tanggal dan waktu
-  sheetLog.getRange(lastRowLog, 2).setValue(name); // Menyimpan nama pengguna
-  sheetLog.getRange(lastRowLog, 3).setValue(amount); // Menyimpan nominal pembayaran
+  // Mengecek jika nama ditemukan
+  if (rowIndex === -1) {
+    sendText(id, "Nama '" + name + "' tidak ditemukan di kolom A.");
+  } else {
+    // Menghapus data dari kolom A hingga AZ di baris yang ditemukan
+    sheet.getRange(rowIndex, 1, 1, 52).clearContent(); // Menghapus konten dari kolom A hingga AZ (52 kolom)
+    sendText(id, "Data untuk nama '" + name + "' telah dihapus.");
+  }
 }
 
 /**
