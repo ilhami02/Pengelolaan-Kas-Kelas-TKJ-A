@@ -1,12 +1,15 @@
-var token_bot = "5846382190:AAELEzwmUgyyKHqHBWrQMFAeTYTFAgBILHI"; // Token Bot Telegram
+var token_bot = "8111489915:AAEj2YHZjy3bG2LyYqMZ_jg_EOkwDrLu9OI";
 var url = "https://api.telegram.org/bot" + token_bot;
-var webAppUrl = "https://script.google.com/macros/s/AKfycbyBh2ZPPBYxZKXfAclfqm3TnQ7hAOrkGeyCTQO1_1PxprW3J0r3Gszyjf5q0vkyqaAqmA/exec"; // Url Web setelah Deployment di GApps Script
+var webAppUrl = "https://script.google.com/macros/s/AKfycbzLQk6a-4oCblLLkbocEpYxWoNOt9aMmlDeY8K0YWCpSTh5gmtLQX542MCCSMj7DOXFMw/exec";
 
-var sheet_name = "KELAS1"; // Nama Sheet
-var sheet_ssid = "1E8AB4e5QxEoxTuAH0rNGXooGcrhy3MR0R1LeJD0m5uk"; // SSID Spreadsheet, bisa dilihat pada link spreadsheet anda
+var sheet_name = "Cash Flow";
+var sheet_log = "LOG"
+var sheet_kegiatan = "Outcome"
+var sheet_ssid = "1BGerJz4rNHuPkpXgOhleaS1etObKkWFjGTADZsGGUUg";
 var sheet = SpreadsheetApp.openById(sheet_ssid).getSheetByName(sheet_name);
 
-var admin_id = "1289002973"; // ID admin untuk akses command tertentu
+
+var admin_ids = ["1289002973", "1410178185"]; // ID admin untuk akses command tertentu
 
 /**
  * Mengatur webhook untuk bot Telegram agar dapat menerima pembaruan dari Telegram.
@@ -50,19 +53,23 @@ function doPost(e) {
   var command_cek = chat_bot.substring(0, 1);
   var command = chat_bot.split(" ")[0];
   var subCommand = chat_bot.split(" ").slice(1).join(" ").trim();
+  var username = updates.message.from.username || "Unknown";
+
+  // Log command to "Log" sheet
+  // logCommand(username, command, subCommand);
 
   if (command_cek === "/") {
     switch(command) {
       case "/start":
-        let username = updates.message.from.username;
-        let text1 = "Selamat Datang " + username;
-        sendText(id, text1);
+        sendText(id, "Selamat Datang " + username);
         break;
       case "/per":
       case "/bayar":
       case "/input":
-      case "/hapus":
-        if (String(id) === admin_id) {
+      case "/hapussaldo":
+      case "/deluser":
+      case "/pengeluaran":
+        if (admin_ids.includes(String(id))) {
           if (subCommand) {
             if (command === "/per") {
               tambahDanEdit(subCommand, id);
@@ -70,8 +77,19 @@ function doPost(e) {
               bayar(subCommand, id);
             } else if (command === "/input") {
               input(subCommand, id);
-            } else if (command === "/hapus") {
-              hapus(subCommand, id);
+            } else if (command === "/hapussaldo") {
+              hapussaldo(subCommand, id);
+            } else if (command === "/deluser") {
+              deluser(subCommand,id);
+            } else if (command === "/pengeluaran"){
+                var amount = parseFloat(subCommand.split(" ")[0]);
+                var usage = subCommand.split(" ").slice(1).join(" ").trim();
+                if (amount && usage) {
+                  pengeluaran(amount, usage, id);
+                } else {
+                  sendText(id, "Format salah! Gunakan: /kurangiSaldo [jumlah] [keterangan penggunaan]");
+                }
+              break;
             }
           } else {
             sendText(id, "Format salah!");
@@ -89,6 +107,9 @@ function doPost(e) {
         break;
       case "/total":
         total(id);
+        break;
+      case "/format":
+        sendText(id, "<b>Format Khusus Admin:</b>\n/input [Nama]\n/bayar [nama] [nominal] (Mencatat pembayaran)\n/pengeluaran [jumlah] [keterangan penggunaan]\n/hapussaldo [nama] [nominal] (Menghapus data pembayaran kas)\n/deluser [nama] (Menghapus user)\n/pengeluaran [Jumlah] [Keterangan] (Mendaftar data pengeluaran)\n\n<b>Format User:</b>\n/cek [nama] (Mengecek status kas pada setiap siswa)\n/total (Mengecek keseluruhan kas)");
         break;
       default:
         sendText(id, "Perintah yang anda kirimkan tidak ada di bot ini!");
@@ -109,25 +130,32 @@ function input(name, id) {
   var exists = dataRange.some(function(row) {
     return row[0] === name;
   });
-  var per = sheet.getRange("BA1").getValue();
+  
+  var per = sheet.getRange("B4").getValue();
   var pembayaran = 0;
   
-  if (per === "Mingguan") {
-    pembayaran = 48;
-  } else if (per === "Bulanan") {
+  if (!isNaN(per) && per !== "") {
     pembayaran = 12;
   } else {
     sendText(id, "Silahkan atur format pembayaran untuk perbulan atau perminggu pada perintah <b>/per</b>");
     return;
   }
 
+  if (!isNaN(name)) {
+    sendText(id, "Nama harus berupa huruf!");
+    return;
+  }
+
   if (exists) {
+    console.log("Input nama tidak berhasil!");
     sendText(id, "Nama '" + name + "' telah ada didalam data!");
   } else {
     sheet.getRange(lastRow + 1, 1).setValue(name);
-    sheet.getRange(lastRow + 1, 50).setValue("0");
-    sheet.getRange(lastRow + 1, 51).setValue(pembayaran);
-    sheet.getRange(lastRow + 1, 52).setValue("0");
+    sheet.getRange(lastRow + 1, 2).setValue("0");
+    sheet.getRange(lastRow + 1, 3).setValue(pembayaran);
+    sheet.getRange(lastRow + 1, 4).setValue("0");
+    console.log("Input nama berhasil!");
+    logCommand("Admin", "/input", `Nama: ${name}`)
     sendText(id, "Nama '" + name + "' telah ditambahkan!");
   }
 }
@@ -142,8 +170,8 @@ function tambahDanEdit(subCommand, id) {
   var per = parts.slice(0, parts.length - 1).join(" ").trim();
   var amount = parseInt(parts[parts.length - 1], 10);
 
-  var cell_per = sheet.getRange("BA1");
-  var cell_nominal = sheet.getRange("BA2");
+  // var cell_per = sheet.getRange("E1");
+  var cell_nominal = sheet.getRange("B4");
 
   if (isNaN(amount)) {
     sendText(id, "Format jumlah pembayaran hanya berupa angka!");
@@ -155,10 +183,12 @@ function tambahDanEdit(subCommand, id) {
     return;
   }
 
-  cell_per.setValue(per);
+  // cell_per.setValue(per);
   cell_nominal.setValue(amount);
 
   sendText(id, "Jumlah pembayaran '" + amount + "' per '" + per + "' telah diatur.");
+  console.log("Pembayaran telah diatur");
+  logCommand("Admin", "/per", `${per}, ${amount}`)
 }
 
 /**
@@ -168,38 +198,54 @@ function tambahDanEdit(subCommand, id) {
  */
 function bayar(subCommand, id) {
   var parts = subCommand.split(" ");
-  var name = parts.slice(0, parts.length - 1).join(" ").trim();
+  var inputName = parts.slice(0, parts.length - 1).join(" ").trim(); // Use input name for lookup
   var amount = parseInt(parts[parts.length - 1], 10);
-  var per = parseInt(sheet.getRange("BA2").getValue(), 10);
+  var per = parseInt(sheet.getRange("B4").getValue(), 10);
+  //var logSheet = SpreadsheetApp.openById(sheet_ssid).getSheetByName("Log"); // Log sheet
 
   var rowdataRange = sheet.getRange(2, 1, sheet.getLastRow(), 1).getValues();
   var rowIndex = -1;
+  var correctName = ""; // To store the correct name
 
   for (var i = 0; i < rowdataRange.length; i++) {
-    if (rowdataRange[i][0] === name) {
-      rowIndex = i + 2; // Menambahkan 2 untuk mengimbangi indeks array dan header
+    if (rowdataRange[i][0].toLowerCase().includes(inputName.toLowerCase())) { // Search by input name
+      rowIndex = i + 2; // Adjust for header
+      correctName = rowdataRange[i][0]; // Get the actual name from the sheet
       break;
     }
   }
 
   if (rowIndex === -1) {
-    sendText(id, "Nama '" + name + "' tidak ditemukan di kolom A.");
+    sendText(id, "Nama '" + inputName + "' tidak ditemukan di kolom A.");
   } else if (isNaN(amount) || amount % per !== 0) {
     sendText(id, "Nominal harus sesuai dengan pembayaran per minggu/bulan");
     return;
+  } else if (sheet.getRange(rowIndex, 3).getValue() <= 0) {
+    sendText(id, "Pembayaran bulanan tahun ini sudah terpenuhi!");
+    return;
   } else {
-    var byrbrpkali = parseInt(sheet.getRange(rowIndex, 50).getValue(), 10);
+    var byrbrpkali = parseInt(sheet.getRange(rowIndex, 2).getValue(), 10);
     var numberOfEntries = amount / per;
-    for (var j = 0; j < numberOfEntries; j++) {
-      sheet.getRange(rowIndex, byrbrpkali + 2 + j).setValue(per);
-    }
-    var kolomSisabayar = parseInt(sheet.getRange(rowIndex, 51).getValue(), 10);
+
+    // Log before the change
+    //var timestamp = new Date();
+    //logSheet.appendRow([correctName, amount, timestamp, "Sebelum", byrbrpkali]); // Log correct name
+
+    var kolomSisabayar = parseInt(sheet.getRange(rowIndex, 3).getValue(), 10);
     var sisabayar = kolomSisabayar - numberOfEntries;
-    sheet.getRange(rowIndex, 50).setValue(byrbrpkali + numberOfEntries);
-    sheet.getRange(rowIndex, 51).setValue(sisabayar);
     var total_bayar = (byrbrpkali + numberOfEntries) * per;
-    sheet.getRange(rowIndex, 52).setValue(total_bayar);
-    sendText(id, "Nominal " + amount + " telah ditambahkan untuk '" + name + "'. Total sekarang: " + total_bayar);
+    var total_saldo = (sheet.getRange("D4").getValue()) + (numberOfEntries * per);
+    sheet.getRange(rowIndex, 2).setValue(byrbrpkali + numberOfEntries);
+    sheet.getRange(rowIndex, 3).setValue(sisabayar);
+    sheet.getRange(rowIndex, 4).setValue(total_bayar);
+    sheet.getRange("D4").setValue(total_saldo);
+
+    // Log after the change
+    //logSheet.appendRow([correctName, amount, timestamp, "Setelah", byrbrpkali + numberOfEntries]); // Log correct name
+
+    sendText(id, "Nominal " + amount + " telah ditambahkan untuk '" + correctName + "'. Total sekarang: " + total_bayar);
+    console.log("Pembayaran berhasil!");
+    logCommand("Admin", "/bayar", `Nama: ${correctName}, Bayar: ${amount}, Total: ${total_bayar}`)
   }
 }
 
@@ -209,23 +255,23 @@ function bayar(subCommand, id) {
  * @param {string} id - ID chat pengguna yang mengirim perintah.
  */
 function cek_kas(name, id) {
-  var per = parseInt(sheet.getRange("BA2").getValue(), 10);
+  var per = parseInt(sheet.getRange("B4").getValue(), 10);
   var dataRange = sheet.getRange('A:A').getValues();
   var rowIndex = -1;
 
   for (var i = 0; i < dataRange.length; i++) {
-    if (dataRange[i][0] === name) {
+      if (dataRange[i][0].toLowerCase().includes(name.toLowerCase())) { // Cari berdasarkan kata pertama
       rowIndex = i + 1; // Mengimbangi indeks array (dimulai dari 1) dan header
       break;
     }
   }
 
   if (rowIndex === -1) {
-    sendText(id, "Nama '" + name + "' tidak ditemukan di kolom A.");
+    sendText(id, "Nama '" + name + "' tidak ditemukan.");
   } else {
-    var kolomSudahbayar = sheet.getRange(rowIndex, 50).getValue();
-    var kolomSisabayar = sheet.getRange(rowIndex, 51).getValue();
-    var sudahBayar = kolomSudahbayar * per;
+    var kolomSudahbayar = sheet.getRange(rowIndex, 2).getValue();
+    var kolomSisabayar = sheet.getRange(rowIndex, 3).getValue();
+    var sudahBayar = sheet.getRange(rowIndex, 4).getValue();
     var sisaBayar = kolomSisabayar * per;
 
     sendText(id, "Nama: " + name + "\nTotal dibayar: " + kolomSudahbayar + " kali.\nNominal total dibayar: " + sudahBayar + "\nKurang bayar: " + kolomSisabayar + " kali.\nNominal kurang Bayar: " + sisaBayar);
@@ -237,23 +283,24 @@ function cek_kas(name, id) {
  * @param {string} id - ID chat pengguna yang mengirim perintah.
  */
 function total(id) {
-  var dataRange = sheet.getRange('A2:A').getValues(); // Mengambil nilai dari kolom A mulai dari baris kedua
+  var dataRange = sheet.getRange('A6:A').getValues(); // Mengambil nilai dari kolom A mulai dari baris kedua
   var count = dataRange.filter(String).length; // Menghitung jumlah data yang tidak kosong
 
-  var totalAX = 0;
-  var valuesAX = sheet.getRange('AX2:AX').getValues(); // Mengambil nilai dari kolom AX mulai dari baris kedua
+  // var totalB = 0;
+  // var valuesB = sheet.getRange('B2:B').getValues(); // Mengambil nilai dari kolom AX mulai dari baris kedua
   
-  for (var i = 0; i < valuesAX.length; i++) {
-    if (!isNaN(valuesAX[i][0]) && valuesAX[i][0] !== "") {
-      totalAX += parseFloat(valuesAX[i][0]);
-    }
-  }
+  // for (var i = 0; i < valuesB.length; i++) {
+  //   if (!isNaN(valuesB[i][0]) && valuesB[i][0] !== "") {
+  //     totalB += parseFloat(valuesB[i][0]);
+  //   }
+  // }
 
-  var multiplier = sheet.getRange("BA2").getValue(); // Mengambil nilai dari BA2
+  // var multiplier = sheet.getRange("E2").getValue(); // Mengambil nilai dari BA2
+  // var totalKas = totalB * multiplier;
+  // sendText(id, "Jumlah siswa: " + count + "\nTotal kas: " + totalKas);
+  var total_saldo = sheet.getRange("D4").getValue();
+  sendText(id, "Jumlah User : " + count + "\nTotal Kas: " + total_saldo);
 
-  var totalKas = totalAX * multiplier;
-
-  sendText(id, "Jumlah siswa: " + count + "\nTotal kas: " + totalKas);
 }
 
 /**
@@ -261,7 +308,124 @@ function total(id) {
  * @param {string} name - Nama yang akan diperiksa.
  * @param {string} id - ID chat pengguna yang mengirim perintah.
  */
-function hapus(name, id) {
+function hapussaldo(subCommand, id) {
+  var parts = subCommand.split(" ");
+  var inputName = parts.slice(0, parts.length - 1).join(" ").trim(); // Use input name for lookup
+  var amountToRemove = parseInt(parts[parts.length - 1], 10); // Get the amount to remove
+
+  if (!isNaN(inputName)) {
+    sendText(id, "Periksa kembali nama anda.");
+    return;
+  }
+  
+  if (isNaN(amountToRemove) || amountToRemove <= 0) {
+    sendText(id, "Jumlah yang ingin dihapus harus berupa angka positif.");
+    return;
+  }
+
+
+  //var logSheet = SpreadsheetApp.openById(sheet_ssid).getSheetByName("Log"); // Log sheet
+  var rowIndex = getRowIndexByPartialName(inputName); // Get row index by partial name
+  var correctName = ""; // To store the correct name
+
+  if (rowIndex === -1) {
+    sendText(id, "Nama '" + inputName + "' tidak ditemukan.");
+    return;
+  } else {
+    correctName = sheet.getRange(rowIndex, 1).getValue(); // Get the actual name from the sheet
+  }
+
+  var currentPaid = parseInt(sheet.getRange(rowIndex, 2).getValue(), 10); // Total paid
+  var paymentPer = parseInt(sheet.getRange("B4").getValue(), 10); // Payment per week/month
+  var currentAmountPaid = currentPaid * paymentPer; // Total amount already paid
+
+  // Check if the amount to remove is valid
+  if (amountToRemove > currentAmountPaid) {
+    sendText(id, "Jumlah yang ingin dihapus melebihi total pembayaran yang sudah dilakukan.");
+    return;
+  }
+
+  // Update the payment details in the main sheet
+  var numberOfEntriesToRemove = Math.floor(amountToRemove / paymentPer); // How many entries to remove
+  var oldPaidCount = (sheet.getRange(rowIndex, 2).getValue()) * (sheet.getRange("B4").getValue());
+  var newPaidCount = currentPaid - numberOfEntriesToRemove; // Remaining paid count
+
+  // Update the main sheet
+  sheet.getRange(rowIndex, 2).setValue(newPaidCount); // Update paid count
+  var remainingToPay = parseInt(sheet.getRange(rowIndex, 3).getValue(), 10); // Remaining to pay
+  remainingToPay += numberOfEntriesToRemove; // Update remaining to pay
+  sheet.getRange(rowIndex, 3).setValue(remainingToPay); // Update remaining to pay
+
+  // Update total_bayar
+  var total_bayar = newPaidCount * paymentPer; // Calculate new total
+  sheet.getRange(rowIndex, 4).setValue(total_bayar); // Update total_bayar
+
+  var total_saldo = (sheet.getRange("D4").getValue()) - (amountToRemove);
+  sheet.getRange("D4").setValue(total_saldo);
+
+  // Log the removal
+  //var timestamp = new Date();
+  //logSheet.appendRow([correctName, -amountToRemove, timestamp, "Hapus", currentPaid]); // Log correct name
+
+  sendText(id, "Jumlah " + amountToRemove + " telah dihapus untuk '" + correctName + "'. Total sekarang: " + total_bayar);
+  console.log("Pembayaran untuk '" + correctName + "' telah dihapus sebesar " + amountToRemove);
+  logCommand("Admin", "/hapussaldo", `Nama: ${correctName}, Total Dihapus: ${amountToRemove}, Total Sebelum: ${oldPaidCount}, Total Sekarang: ${total_bayar}`)
+}
+
+function pengeluaran(amount, usage, id) {
+  var total_saldo = parseFloat(sheet.getRange("D4").getValue());
+  
+  // Cek apakah jumlah yang ingin dikurangi valid
+  if (isNaN(amount) || amount <= 0) {
+    sendText(id, "Jumlah yang ingin dikurangi harus berupa angka positif.");
+    return;
+  }
+
+  if (amount > total_saldo) {
+    sendText(id, "Jumlah yang ingin dikurangi melebihi total saldo.");
+    return;
+  }
+
+  // Update total saldo
+  total_saldo -= amount;
+  sheet.getRange("D4").setValue(total_saldo);
+
+  // Simpan log pengurangan di sheet "Pengeluaran"
+  var pengeluaranSheet = SpreadsheetApp.openById(sheet_ssid).getSheetByName("Outcome");
+  var timestamp = new Date();
+  pengeluaranSheet.appendRow([timestamp, amount, usage, total_saldo]);
+
+  sendText(id, "Total saldo telah dikurangi sebesar " + amount + " untuk " + usage + ". Saldo sekarang: " + total_saldo);
+  console.log("Saldo dikurangi sebesar " + amount + " untuk " + usage);
+  logCommand("Admin", "/pengeluaran", `Nominal dipakai: ${amount}, Penggunaan: ${usage}, Saldo Akhir: ${total_saldo}`);
+}
+
+function getRowIndexByPartialName(partialName) {
+  var dataRange = sheet.getRange('A:A').getValues();
+  for (var i = 0; i < dataRange.length; i++) {
+    if (dataRange[i][0].toLowerCase().includes(partialName.toLowerCase())) {
+      return i + 1; // Mengimbangi indeks array
+    }
+  }
+  return -1; // Jika tidak ditemukan
+}
+
+function logCommand(username, command, details) {
+  var logSheet = SpreadsheetApp.openById(sheet_ssid).getSheetByName("LOG");
+  var timestamp = new Date();
+  var lastRow = logSheet.getLastRow() + 1;
+
+  logSheet.appendRow([timestamp, username, command, details || "N/A"]);
+}
+
+/**
+ * Menambahkan kolom baru ke sheet.
+ */
+function addColumns() {
+  sheet.insertColumnsAfter(sheet.getMaxColumns(), 20); // Menambahkan 20 kolom baru setelah kolom terakhir
+}
+
+function deluser(name, id) {
   // Mendapatkan nilai dari kolom A
   var dataRange = sheet.getRange('A:A').getValues();
   var rowIndex = -1;
@@ -276,17 +440,13 @@ function hapus(name, id) {
 
   // Mengecek jika nama ditemukan
   if (rowIndex === -1) {
-    sendText(id, "Nama '" + name + "' tidak ditemukan di kolom A.");
+    sendText(id, "Nama '" + name + "' tidak ditemukan!\nPeriksa kembali nama yang akan dihapus.");
   } else {
+    var total_saldo = (sheet.getRange("D4").getValue())- (sheet.getRange(rowIndex, 4).getValue());
+    sheet.getRange("D4").setValue(total_saldo); 
     // Menghapus data dari kolom A hingga AZ di baris yang ditemukan
-    sheet.getRange(rowIndex, 1, 1, 52).clearContent(); // Menghapus konten dari kolom A hingga AZ (52 kolom)
+    sheet.getRange(rowIndex, 1, 1, 4).clearContent(); // Menghapus konten dari kolom A hingga AZ (52 kolom)
     sendText(id, "Data untuk nama '" + name + "' telah dihapus.");
+    logCommand("Admin", "/deluser", `Name Remove: ${name}`)
   }
-}
-
-/**
- * Menambahkan kolom baru ke sheet.
- */
-function addColumns() {
-  sheet.insertColumnsAfter(sheet.getMaxColumns(), 20); // Menambahkan 20 kolom baru setelah kolom terakhir
 }
