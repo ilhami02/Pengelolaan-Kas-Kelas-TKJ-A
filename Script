@@ -1,6 +1,6 @@
-var token_bot = "8111489915:AAEj2YHZjy3bG2LyYqMZ_jg_EOkwDrLu9OI";
+var token_bot = "";
 var url = "https://api.telegram.org/bot" + token_bot;
-var webAppUrl = "https://script.google.com/macros/s/AKfycbzLQk6a-4oCblLLkbocEpYxWoNOt9aMmlDeY8K0YWCpSTh5gmtLQX542MCCSMj7DOXFMw/exec";
+var webAppUrl = "";
 
 var sheet_name = "Cash Flow";
 var sheet_log = "LOG"
